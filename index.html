@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>散歩ルート提案アプリ</title>
+    <!-- Tailwind CSSを読み込み、モダンなデザインを適用 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 全体的なスタイル設定 */
+        body {
+            font-family: 'Inter', sans-serif; /* フォントをInterに設定 */
+            background-color: #f0f4f8; /* 背景色 */
+            color: #334155; /* テキスト色 */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh; /* 最小高さをビューポートの高さに設定 */
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        /* アプリのコンテナスタイル */
+        #app-container {
+            display: flex;
+            flex-direction: column; /* スマートフォンでは縦並び */
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+            background-color: #ffffff;
+            border-radius: 12px; /* 角丸 */
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); /* 影 */
+            padding: 30px;
+        }
+        /* メディアクエリ：タブレット・デスクトップでは横並び */
+        @media (min-width: 768px) {
+            #app-container {
+                flex-direction: row;
+            }
+        }
+        /* コントロールパネルのスタイル */
+        #controls-panel {
+            flex: 1; /* 柔軟な幅 */
+            padding: 20px;
+            border-radius: 8px;
+            background-color: #f8fafc;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+            min-width: 300px;
+        }
+        /* マップコンテナのスタイル */
+        #map-container {
+            flex: 2; /* コントロールパネルの2倍の幅 */
+            height: 600px; /* マップの高さ */
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            background-color: #e2e8f0; /* マップが読み込まれるまでのプレースホルダー背景 */
+        }
+        /* 入力グループのスタイル */
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #475569;
+        }
+        .input-group input[type="text"],
+        .input-group input[type="number"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 1rem;
+            color: #334155;
+            transition: border-color 0.2s;
+        }
+        .input-group input[type="text"]:focus,
+        .input-group input[type="number"]:focus {
+            outline: none;
+            border-color: #3b82f6; /* フォーカス時のボーダー色 */
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); /* フォーカス時のシャドウ */
+        }
+        /* ボタンの共通スタイル */
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s; /* ホバー・アクティブ時のアニメーション */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            border: none;
+        }
+        /* プライマリボタンのスタイル */
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+            transform: translateY(-1px); /* 少し上に移動 */
+        }
+        .btn-primary:active {
+            transform: translateY(0);
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2); /* 押し込み時のシャドウ */
+        }
+        /* セカンダリボタンのスタイル */
+        .btn-secondary {
+            background-color: #64748b;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #475569;
+            transform: translateY(-1px);
+        }
+        .btn-secondary:active {
+            transform: translateY(0);
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        /* 危険ボタン（削除など）のスタイル */
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626;
+            transform: translateY(-1px);
+        }
+        .btn-danger:active {
+            transform: translateY(0);
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        /* 経由地点アイテムのスタイル */
+        .waypoint-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            background-color: #e2e8f0;
+            padding: 8px;
+            border-radius: 6px;
+        }
+        .waypoint-item input {
+            flex-grow: 1; /* 入力フィールドが残りのスペースを占める */
+        }
+        /* メッセージボックスのスタイル */
+        .message-box {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 20px;
+            max-width: 400px;
+            text-align: center;
+            position: fixed; /* 画面中央に固定 */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            display: none; /* デフォルトでは非表示 */
+        }
+        .message-box h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .message-box p {
+            margin-bottom: 20px;
+            color: #555;
+        }
+        .message-box button {
+            background-color: #3b82f6;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s;
+        }
+        .message-box button:hover {
+            background-color: #2563eb;
+        }
+        /* ローディングオーバーレイのスタイル */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); /* 半透明の背景 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1001;
+            display: none; /* デフォルトでは非表示 */
+        }
+        /* ローディングスピナーのスタイル */
+        .loading-spinner {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #3b82f6; /* 青色のトップボーダー */
+            border-radius: 50%; /* 円形 */
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite; /* 回転アニメーション */
+        }
+        /* スピナーの回転アニメーションキーフレーム */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <div id="controls-panel">
+            <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">散歩ルート提案</h2>
+
+            <div class="input-group">
+                <label for="walkingTime">散歩時間 (分):</label>
+                <input type="number" id="walkingTime" value="60" min="10" max="240">
+            </div>
+
+            <div class="input-group">
+                <label for="startLocation">スタート地点:</label>
+                <input type="text" id="startLocation" value="東京駅">
+            </div>
+
+            <div class="input-group">
+                <label for="goalLocation">ゴール地点:</label>
+                <input type="text" id="goalLocation" value="東京駅">
+                <button id="randomGoalBtn" class="btn btn-secondary w-full mt-2" data-random="false">ゴールをランダム設定</button>
+            </div>
+
+            <div class="input-group">
+                <label>経由地点:</label>
+                <div id="waypointsContainer">
+                    <!-- 経由地点はここに動的に追加されます -->
+                </div>
+                <button id="addWaypointBtn" class="btn btn-secondary w-full mt-2">+ 経由地点を追加</button>
+            </div>
+
+            <button id="generateRouteBtn" class="btn btn-primary w-full mt-4">ルートを生成</button>
+
+            <!-- メッセージボックス -->
+            <div id="messageBox" class="message-box">
+                <h3 id="messageTitle"></h3>
+                <p id="messageContent"></p>
+                <button onclick="hideMessageBox()">OK</button>
+            </div>
+
+            <!-- ローディングオーバーレイ -->
+            <div id="loadingOverlay" class="loading-overlay">
+                <div class="loading-spinner"></div>
+            </div>
+        </div>
+
+        <div id="map-container">
+            <div id="map" style="width: 100%; height: 100%;"></div>
+        </div>
+    </div>
+
+    <script>
+        let map; // Googleマップオブジェクト
+        let directionsService; // ルート検索サービス
+        let directionsRenderer; // ルート描画サービス
+        let reachableCircle; // 到達可能範囲を示す円
+        let startMarker; // スタート地点のマーカー
+
+        // マップの準備ができたことを示すPromise
+        let mapReadyPromiseResolve;
+        const mapReadyPromise = new Promise(resolve => {
+            mapReadyPromiseResolve = resolve;
+        });
+
+        const WALKING_SPEED_MPS = 80 / 60; // 歩行速度: 秒速 (メートル/秒)
+        const WALKING_SPEED_MPM = 80; // 歩行速度: 分速 (メートル/分)
+
+        const WAYPOINT_MAX_COUNT = 10; // 経由地点の最大数
+
+        // Canvas環境から提供されるグローバル変数（APIキーなど）
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        /**
+         * メッセージボックスを表示する関数
+         * @param {string} title - メッセージボックスのタイトル
+         * @param {string} message - 表示するメッセージ内容
+         */
+        function showMessageBox(title, message) {
+            document.getElementById('messageTitle').innerText = title;
+            document.getElementById('messageContent').innerText = message;
+            document.getElementById('messageBox').style.display = 'block';
+        }
+
+        /**
+         * メッセージボックスを非表示にする関数
+         */
+        function hideMessageBox() {
+            document.getElementById('messageBox').style.display = 'none';
+        }
+
+        /**
+         * ローディングオーバーレイを表示する関数
+         */
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+
+        /**
+         * ローディングオーバーレイを非表示にする関数
+         */
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        /**
+         * Googleマップを初期化する関数
+         * Google Maps APIのコールバックとして呼び出されます。
+         */
+        function initMap() {
+            // マップの初期中心地（東京駅）とズームレベル
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 35.681236, lng: 139.767125 }, // 東京駅の緯度経度
+                zoom: 12,
+                mapTypeControl: false, // マップタイプコントロールを非表示
+                streetViewControl: false, // ストリートビューコントロールを非表示
+                fullscreenControl: false // フルスクリーンコントロールを非表示
+            });
+
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer({
+                map: map, // マップオブジェクトがここで設定される
+                polylineOptions: {
+                    strokeColor: '#3b82f6', // ルートの線の色
+                    strokeOpacity: 0.8,
+                    strokeWeight: 6
+                },
+                markerOptions: {
+                    // マーカーのカスタマイズが必要な場合はここに設定
+                }
+            });
+
+            // マップが完全に準備できたことを示すPromiseを解決
+            mapReadyPromiseResolve();
+
+            // マップが準備できた後、初期のスタート地点を更新
+            updateStartLocation();
+        }
+
+        /**
+         * Google Maps APIスクリプトを動的に読み込む関数
+         * APIキーはCanvas環境によって自動的に注入されます。
+         */
+        function loadGoogleMapsScript() {
+            const script = document.createElement('script');
+            // APIキーは空文字列のままにしておく（Canvasが自動注入）
+            script.src = `https://maps.googleapis.com/maps/api/js?key=&libraries=places,geometry&callback=initMap`;
+            script.async = true;
+            script.defer = true;
+            document.head.appendChild(script);
+            script.onerror = () => {
+                showMessageBox('エラー', 'Google Maps APIの読み込みに失敗しました。インターネット接続を確認してください。');
+            };
+        }
+
+        /**
+         * 住所を緯度経度座標に変換するジオコーディング関数
+         * @param {string} address - ジオコーディングする住所文字列
+         * @returns {Promise<google.maps.LatLng>} - 緯度経度オブジェクトを解決するPromise
+         */
+        async function geocodeAddress(address) {
+            await mapReadyPromise; // マップが準備できるまで待機
+            return new Promise((resolve, reject) => {
+                const geocoder = new google.maps.Geocoder();
+                geocoder.geocode({ 'address': address }, (results, status) => {
+                    if (status === 'OK') {
+                        resolve(results[0].geometry.location);
+                    } else {
+                        reject(new Error(`ジオコーディング失敗: ${status} - ${address}`));
+                    }
+                });
+            });
+        }
+
+        /**
+         * 到達可能範囲を示す円を描画する関数
+         * @param {google.maps.LatLng} center - 円の中心（スタート地点）
+         * @param {number} radius - 円の半径（メートル）
+         */
+        async function drawReachableCircle(center, radius) {
+            await mapReadyPromise; // マップが準備できるまで待機
+            if (reachableCircle) {
+                reachableCircle.setMap(null); // 以前の円があれば削除
+            }
+            reachableCircle = new google.maps.Circle({
+                strokeColor: '#3b82f6', // 円の線の色
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+                fillColor: '#3b82f6', // 円の塗りつぶし色
+                fillOpacity: 0.15,
+                map: map,
+                center: center,
+                radius: radius // メートル単位
+            });
+            map.fitBounds(reachableCircle.getBounds()); // 円がマップに収まるようにズームを調整
+        }
+
+        /**
+         * スタート地点のマーカーを更新し、到達可能範囲の円を再描画する関数
+         */
+        async function updateStartLocation() {
+            await mapReadyPromise; // マップが準備できるまで待機
+
+            const startLocationInput = document.getElementById('startLocation');
+            const startAddress = startLocationInput.value.trim();
+
+            if (!startAddress) {
+                if (startMarker) startMarker.setMap(null); // マーカーを削除
+                if (reachableCircle) reachableCircle.setMap(null); // 円を削除
+                return;
+            }
+
+            try {
+                const startLatLng = await geocodeAddress(startAddress);
+                if (startMarker) {
+                    startMarker.setMap(null); // 以前のマーカーを削除
+                }
+                startMarker = new google.maps.Marker({
+                    position: startLatLng,
+                    map: map,
+                    title: 'スタート地点',
+                    icon: {
+                        url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png' // 緑色のドットアイコン
+                    }
+                });
+                map.setCenter(startLatLng); // マップの中心をスタート地点に設定
+
+                const walkingTime = parseFloat(document.getElementById('walkingTime').value);
+                if (walkingTime > 0) {
+                    const radius = walkingTime * WALKING_SPEED_MPM; // 半径をメートルで計算
+                    drawReachableCircle(startLatLng, radius);
+                }
+            } catch (error) {
+                console.error(error);
+                showMessageBox('エラー', `スタート地点のジオコーディングに失敗しました: ${startAddress}`);
+            }
+        }
+
+        /**
+         * 指定された円の範囲内でランダムな緯度経度座標を生成する関数
+         * @param {google.maps.LatLng} center - 円の中心座標
+         * @param {number} radiusMeters - 円の半径（メートル）
+         * @returns {google.maps.LatLng} - 円内のランダムな緯度経度座標
+         */
+        function getRandomPointInCircle(center, radiusMeters) {
+            // google.maps.geometry.spherical は 'geometry' ライブラリが必要
+            // loadGoogleMapsScriptでlibraries=places,geometryを追加済み
+            const earthRadius = 6378137; // 地球の半径（メートル）
+            const latRad = center.lat() * Math.PI / 180; // 中心緯度をラジアンに変換
+
+            const angularRadius = radiusMeters / earthRadius; // 角度半径
+
+            const u = Math.random();
+            const v = Math.random();
+            const w = angularRadius * Math.sqrt(u); // ランダムな距離（角度）
+            const t = 2 * Math.PI * v; // ランダムな角度（ラジアン）
+            const x = w * Math.cos(t);
+            const y = w * Math.sin(t);
+
+            // 新しい緯度経度を計算
+            const newLat = Math.asin(Math.sin(latRad) * Math.cos(w) + Math.cos(latRad) * Math.sin(w) * y / w);
+            const newLng = center.lng() * Math.PI / 180 + Math.atan2(x, Math.cos(latRad) * Math.cos(w) - Math.sin(latRad) * Math.sin(w) * y / w);
+
+            return new google.maps.LatLng(newLat * 180 / Math.PI, newLng * 180 / Math.PI);
+        }
+
+        /**
+         * ルートを生成し、マップに表示するメイン関数
+         */
+        async function generateRoute() {
+            showLoading(); // ローディング表示
+            await mapReadyPromise; // マップが準備できるまで待機
+
+            try {
+                const walkingTime = parseFloat(document.getElementById('walkingTime').value);
+                const startAddress = document.getElementById('startLocation').value.trim();
+                let goalAddress = document.getElementById('goalLocation').value.trim();
+                const isRandomGoal = document.getElementById('randomGoalBtn').dataset.random === 'true';
+
+                // 入力値のバリデーション
+                if (!walkingTime || walkingTime <= 0) {
+                    showMessageBox('入力エラー', '有効な散歩時間を入力してください。');
+                    hideLoading();
+                    return;
+                }
+                if (!startAddress) {
+                    showMessageBox('入力エラー', 'スタート地点を入力してください。');
+                    hideLoading();
+                    return;
+                }
+
+                // 目標とするルート長の範囲を計算 (±10%)
+                const targetLengthMin = (walkingTime * WALKING_SPEED_MPM) * 0.9; // メートル
+                const targetLengthMax = (walkingTime * WALKING_SPEED_MPM) * 1.1; // メートル
+
+                const startLatLng = await geocodeAddress(startAddress);
+                let goalLatLng;
+
+                // ゴール地点がランダム設定の場合
+                if (isRandomGoal) {
+                    const radius = walkingTime * WALKING_SPEED_MPM; // 到達可能半径
+                    goalLatLng = getRandomPointInCircle(startLatLng, radius);
+                    // ランダムに設定されたゴール地点の住所は表示しないが、内部的に緯度経度を使用
+                } else {
+                    if (!goalAddress) {
+                        showMessageBox('入力エラー', 'ゴール地点を入力するか、ランダム設定してください。');
+                        hideLoading();
+                        return;
+                    }
+                    goalLatLng = await geocodeAddress(goalAddress);
+                }
+
+                // 経由地点の取得とジオコーディング
+                const waypointInputs = document.querySelectorAll('#waypointsContainer input[type="text"]');
+                let waypoints = [];
+                for (const input of waypointInputs) {
+                    const address = input.value.trim();
+                    if (address) {
+                        waypoints.push({ location: await geocodeAddress(address), stopover: true });
+                    }
+                }
+
+                let routeResult;
+                let currentLength = 0;
+                let attempts = 0;
+                const MAX_ATTEMPTS = 5; // ルート長調整の試行回数制限
+
+                // ルート生成と長さ調整のループ
+                while (attempts < MAX_ATTEMPTS) {
+                    attempts++;
+                    const request = {
+                        origin: startLatLng,
+                        destination: goalLatLng,
+                        waypoints: waypoints,
+                        optimizeWaypoints: false, // 経由地点の順序を維持
+                        travelMode: google.maps.TravelMode.WALKING
+                    };
+
+                    try {
+                        routeResult = await directionsService.route(request);
+                        if (routeResult.status === 'OK') {
+                            // ルートの総距離を計算
+                            currentLength = routeResult.routes[0].legs.reduce((total, leg) => total + leg.distance.value, 0);
+                            console.log(`試行 ${attempts}: ルート長 = ${currentLength}m, 目標範囲 = ${targetLengthMin.toFixed(0)}-${targetLengthMax.toFixed(0)}m`);
+
+                            if (currentLength >= targetLengthMin && currentLength <= targetLengthMax) {
+                                break; // 適切なルートが見つかったらループを抜ける
+                            } else if (currentLength < targetLengthMin) {
+                                // ルートが短すぎる場合、経由地点を追加して延長を試みる
+                                console.log('ルートが短すぎます。経由地点を追加します...');
+                                const routePath = routeResult.routes[0].overview_path; // ルートのパス
+                                if (routePath.length > 1) {
+                                    // ルート上のランダムなセグメントの中間点付近に新しい経由地点を追加
+                                    const segmentIndex = Math.floor(Math.random() * (routePath.length - 1));
+                                    const p1 = routePath[segmentIndex];
+                                    const p2 = routePath[segmentIndex + 1];
+                                    const midPoint = google.maps.geometry.spherical.interpolate(p1, p2, 0.5); // セグメントの中間点
+
+                                    // 中間点から少しずらしたランダムなオフセット地点を生成
+                                    const offsetDistance = Math.random() * 500 + 100; // 100-600メートル
+                                    const randomOffsetPoint = getRandomPointInCircle(midPoint, offsetDistance);
+
+                                    // 既存の経由地点配列に新しい地点を挿入
+                                    waypoints.splice(Math.floor(waypoints.length / 2), 0, { location: randomOffsetPoint, stopover: true });
+                                } else {
+                                    // スタートとゴールしかない場合、その中間点付近に経由地点を追加
+                                    const midpointBetweenStartGoal = google.maps.geometry.spherical.interpolate(startLatLng, goalLatLng, 0.5);
+                                    const offsetDistance = Math.random() * 1000 + 500; // 500-1500メートル
+                                    const randomOffsetPoint = getRandomPointInCircle(midpointBetweenStartGoal, offsetDistance);
+                                    waypoints.push({ location: randomOffsetPoint, stopover: true });
+                                }
+                            } else {
+                                // ルートが長すぎる場合。経由地点を追加しても短くはならないため、このルートを受け入れる
+                                console.log('ルートが長すぎます。経由地点を追加しても短くはできません。');
+                                break; // 長いルートを受け入れてループを抜ける
+                            }
+                        } else {
+                            showMessageBox('ルート生成失敗', `ルートの生成に失敗しました: ${routeResult.status}`);
+                            hideLoading();
+                            return;
+                        }
+                    } catch (error) {
+                        console.error('Directions Service error:', error);
+                        showMessageBox('エラー', 'ルート生成中に問題が発生しました。');
+                        hideLoading();
+                        return;
+                    }
+                }
+
+                // ルートが正常に生成された場合
+                if (routeResult && routeResult.status === 'OK') {
+                    directionsRenderer.setDirections(routeResult); // マップにルートを表示
+                    map.setCenter(startLatLng); // マップの中心をスタート地点に設定
+                    showMessageBox('ルート生成完了', `提案された散歩ルートの長さは ${currentLength.toFixed(0)}m です。`);
+                } else {
+                    showMessageBox('ルート生成失敗', '適切なルートを見つけることができませんでした。条件を調整してください。');
+                }
+
+            } catch (error) {
+                console.error('Error generating route:', error);
+                showMessageBox('エラー', `ルート生成中にエラーが発生しました: ${error.message}`);
+            } finally {
+                hideLoading(); // ローディングを非表示
+            }
+        }
+
+        // 経由地点管理
+        let waypointCount = 0;
+
+        /**
+         * 経由地点の入力フィールドを追加する関数
+         */
+        function addWaypointInput() {
+            if (waypointCount >= WAYPOINT_MAX_COUNT) {
+                showMessageBox('制限', `経由地点は最大${WAYPOINT_MAX_COUNT}個までです。`);
+                return;
+            }
+
+            const container = document.getElementById('waypointsContainer');
+            const div = document.createElement('div');
+            div.className = 'waypoint-item';
+            div.innerHTML = `
+                <input type="text" placeholder="経由地点 ${waypointCount + 1}">
+                <button class="btn btn-danger remove-waypoint-btn">削除</button>
+            `;
+            container.appendChild(div);
+            waypointCount++;
+
+            // 削除ボタンにイベントリスナーを設定
+            div.querySelector('.remove-waypoint-btn').addEventListener('click', () => {
+                container.removeChild(div);
+                waypointCount--;
+                updateWaypointPlaceholders(); // プレースホルダーを更新
+            });
+            updateWaypointPlaceholders(); // プレースホルダーを更新
+        }
+
+        /**
+         * 経由地点のプレースホルダーテキストを更新する関数
+         */
+        function updateWaypointPlaceholders() {
+            const inputs = document.querySelectorAll('#waypointsContainer input[type="text"]');
+            inputs.forEach((input, index) => {
+                input.placeholder = `経由地点 ${index + 1}`;
+            });
+        }
+
+        // イベントリスナーの設定
+        document.addEventListener('DOMContentLoaded', () => {
+            loadGoogleMapsScript(); // DOMが読み込まれたらマップスクリプトを読み込む
+
+            document.getElementById('generateRouteBtn').addEventListener('click', generateRoute); // ルート生成ボタン
+            document.getElementById('addWaypointBtn').addEventListener('click', addWaypointInput); // 経由地点追加ボタン
+
+            // ゴールをランダム設定ボタンのトグル機能
+            document.getElementById('randomGoalBtn').addEventListener('click', () => {
+                const goalInput = document.getElementById('goalLocation');
+                const randomGoalBtn = document.getElementById('randomGoalBtn');
+                if (randomGoalBtn.dataset.random === 'true') {
+                    // ランダム設定を解除
+                    randomGoalBtn.dataset.random = 'false';
+                    goalInput.readOnly = false; // 入力可能にする
+                    goalInput.value = ''; // 値をクリア
+                    randomGoalBtn.textContent = 'ゴールをランダム設定';
+                    randomGoalBtn.classList.remove('btn-primary');
+                    randomGoalBtn.classList.add('btn-secondary');
+                } else {
+                    // ランダム設定を有効化
+                    randomGoalBtn.dataset.random = 'true';
+                    goalInput.readOnly = true; // 読み取り専用にする
+                    goalInput.value = 'ランダムに設定されます';
+                    randomGoalBtn.textContent = 'ランダム設定を解除';
+                    randomGoalBtn.classList.remove('btn-secondary');
+                    randomGoalBtn.classList.add('btn-primary');
+                }
+            });
+
+            // スタート地点または散歩時間変更時に到達可能円を更新
+            document.getElementById('startLocation').addEventListener('change', updateStartLocation);
+            document.getElementById('walkingTime').addEventListener('input', updateStartLocation);
+
+            // ページロード時に初期の到達可能円を描画する代わりに、initMap内で呼び出すように変更
+            // updateStartLocation(); // この行は削除
+        });
+    </script>
+</body>
+</html>
